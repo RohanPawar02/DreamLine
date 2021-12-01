@@ -1,0 +1,4 @@
+GET http://127.0.0.1:8000/user/ HTTP/1.1
+Content-Type: application/json
+Authorization: de80450710a901d6ec1d7dbd908d786d2f5f8434dab88790fb4d6f2c6418
+

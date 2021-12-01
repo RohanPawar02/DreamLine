@@ -1,0 +1,17 @@
+# To use the http client, install "REST Client" extension of Visual Studio Code.
+# To send the request and get the result, click the 'Send Request' 
+POST http://127.0.0.1:8000/orders/add/ HTTP/1.1
+content-type: application/json
+Authorization: 	bfac8cd2a0413d1d5f9315b724f508be4d128eed75c474297fc285507ce1
+
+{
+    "total_price": 99.90,
+    "full_name": "test100011",
+    "address_line1": "teat address",
+    "address_line2": "test address2",
+    "city": "test city",
+    "state": "test state",
+    "postal_code": "560008",
+    "country": "India",
+    "telephone": "67555678"
+}

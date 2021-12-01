@@ -1,6 +1,8 @@
 from config.settings import BASE_DIR, MEDIA_URL
 import os
-from apps.userbackground.serializers import UserBackgroundSerializer
+from requests import get
+from apps.userbackground.serializers import UserBackgroundSerializer, UserBackgroundSerializerList
+from apps.backgroundimage.serializers import BackgroundImgSerializer
 from apps.userbackground.models import UserBackground
 from apps.backgroundimage.models import BackgroundImg
 from PIL import Image
@@ -11,6 +13,7 @@ from rest_framework.response import Response
 from django.core.files.storage import FileSystemStorage
 from rest_framework import generics
 from apps.user.mixins import CustomLoginRequiredMixin
+from cloudinary.uploader import upload
 
 
 X_DEFAULT_VALUE = 12
@@ -83,8 +86,9 @@ class UserBackgroundAdd(CustomLoginRequiredMixin, generics.CreateAPIView):
         serializer.validate(request.data)
 
         # Get Image Background
-        background = BackgroundImg.objects.get(
-            id=request.data['background_id'])
+        background = BackgroundImg.objects.get(id=request.data['background_id'])
+        background_serializer = BackgroundImgSerializer(background)
+        background_image_url = background_serializer.data['image']
 
         # Define the path to our custom .ttf font
         raleway_bold, raleway_medium = load_font()
@@ -103,14 +107,10 @@ class UserBackgroundAdd(CustomLoginRequiredMixin, generics.CreateAPIView):
         logo = Image.open(logo_file).convert('RGBA')
 
         # Open Image Background
-        # generated_background_image = Image.open(
-            # MEDIA_URL+str(background.image))
-
-        generated_background_image = Image.open(background.image)
+        generated_background_image = Image.open(get(background_image_url, stream=True).raw)
 
         # Get Resize Width & Height
-        width_resize, baseheight = resize_image(
-            logo, generated_background_image.size[1])
+        width_resize, baseheight = resize_image(logo, generated_background_image.size[1])
 
         # Resize Width & Height of Logo
         logo = logo.resize((width_resize, baseheight))
@@ -119,8 +119,7 @@ class UserBackgroundAdd(CustomLoginRequiredMixin, generics.CreateAPIView):
         draw = generate_background_color(generated_background_image)
 
         # Paste Logo on specific position of background image
-        generated_background_image.paste(
-            logo, (X_DEFAULT_VALUE, Y_DEFAULT_VALUE), logo)
+        generated_background_image.paste(logo, (X_DEFAULT_VALUE, Y_DEFAULT_VALUE), logo)
 
         # Draw white a horizontal straight line
         draw.line([(X_DEFAULT_VALUE, baseheight + 20),
@@ -137,6 +136,12 @@ class UserBackgroundAdd(CustomLoginRequiredMixin, generics.CreateAPIView):
         # Generate Filename
         filename = get_filename(generated_background_image.format)
 
+        # Save Image Into Media
+        generated_background_image.save(MEDIA_URL+filename, quality=100)
+
+        # Upload Image From Media To Cloudinary
+        uploaded_background_image = upload(MEDIA_URL+filename)
+
         new_user_background = UserBackground.objects.create(
             user=request.login_user,
             username=request.data['username'],
@@ -144,14 +149,14 @@ class UserBackgroundAdd(CustomLoginRequiredMixin, generics.CreateAPIView):
             role=request.data['role'],
             company_logo=logo_filename,
             background_id=background,
-            generated_background=filename,
+            generated_background=uploaded_background_image['url'],
         )
-
-        # Save Image
-        generated_background_image.save(MEDIA_URL+filename, quality=100)
-
+        
         # Convert Model to Serializer
         serializer = UserBackgroundSerializer(new_user_background)
+
+        # Remove Image From Media Because we don't need it anymore
+        os.remove(os.path.join(MEDIA_URL, filename))
 
         # Response data as Dict
         return Response(serializer.data)
@@ -159,7 +164,7 @@ class UserBackgroundAdd(CustomLoginRequiredMixin, generics.CreateAPIView):
 
 class UserBackgroundList(CustomLoginRequiredMixin, generics.ListAPIView):
     queryset = UserBackground.objects.all()
-    serializer_class = UserBackgroundSerializer
+    serializer_class = UserBackgroundSerializerList
 
     def get(self, request, *args, **kwargs):
         self.queryset = UserBackground.objects.order_by(

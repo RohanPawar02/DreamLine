@@ -29,3 +29,10 @@ class UserBackgroundSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError(errors)
 
         return data
+
+class UserBackgroundSerializerList(serializers.ModelSerializer):
+    generated_background = serializers.ImageField(required=True)
+
+    class Meta:
+        model = UserBackground
+        fields = '__all__'
